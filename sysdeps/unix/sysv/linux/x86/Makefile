@@ -22,3 +22,16 @@ endif
 ifeq ($(subdir),elf)
 sysdep_routines += dl-vdso
 endif
+
+ifeq ($(enable-cet),yes)
+ifeq ($(subdir),elf)
+sysdep_routines += dl-cet-nonshared
+sysdep-dl-routines += dl-cet
+endif
+
+# Make <sys/cet.h> available to all assembly codes.
+sysdep_headers += sys/cet.h
+
+# Compile assembly codes with <sys/cet.h> if CET is enabled.
+asm-CPPFLAGS += -include $(..)sysdeps/unix/sysv/linux/x86/sys/cet.h
+endif
