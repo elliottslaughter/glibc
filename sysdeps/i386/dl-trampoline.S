@@ -50,6 +50,29 @@ _dl_runtime_resolve:
 	cfi_endproc
 	.size _dl_runtime_resolve, .-_dl_runtime_resolve
 
+# The SHSTK compatible version.
+	.text
+	.globl _dl_runtime_resolve_shstk
+	.type _dl_runtime_resolve_shstk, @function
+	cfi_startproc
+	.align 16
+_dl_runtime_resolve_shstk:
+	cfi_adjust_cfa_offset (8)
+	pushl %eax		# Preserve registers otherwise clobbered.
+	cfi_adjust_cfa_offset (4)
+	pushl %edx
+	cfi_adjust_cfa_offset (4)
+	movl 12(%esp), %edx	# Copy args pushed by PLT in register.  Note
+	movl 8(%esp), %eax	# that `fixup' takes its parameters in regs.
+	call _dl_fixup		# Call resolver.
+	movl (%esp), %edx	# Get register content back.
+	movl %eax, %ecx		# Store the function address.
+	movl 4(%esp), %eax	# Get register content back.
+	addl $16, %esp		# Adjust stack: PLT1 + PLT2 + %eax + %edx
+	cfi_adjust_cfa_offset (-16)
+	jmp *%ecx		# Jump to function address.
+	cfi_endproc
+	.size _dl_runtime_resolve_shstk, .-_dl_runtime_resolve_shstk
 
 #ifndef PROF
 	.globl _dl_runtime_profile
