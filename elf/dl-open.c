@@ -72,6 +72,31 @@ add_to_global (struct link_map *new)
     if (new->l_searchlist.r_list[cnt]->l_global == 0)
       ++to_add;
 
+  struct link_namespaces *ns = &GL(dl_ns)[new->l_ns];
+
+  if (__glibc_unlikely (new->l_ns != LM_ID_BASE
+			&& ns->_ns_main_searchlist == NULL))
+    {
+      /* An initial object was loaded with dlmopen into a distinct namespace
+	 that has no global searchlist (RTLD_GLOBAL) and RTLD_GLOBAL was used.
+	 Or that object then dlopened another object into the global
+	 searchlist.  We find ourselves with no global searchlist initialized.
+	 We have two choices, either we forbid this scenario and return an
+	 error or treat the first RTLD_GLOBAL DSOs searchlist as the global
+	 searchlist of the namespace.  We do the latter since it's the most
+	 sensible course of action since you may dlmopen other libraries which
+	 have no idea they have been isolated.  Thus RTLD_GLOBAL dlopen calls
+	 within the new namespace are restricted to the new namespace and may
+	 reference the symbols of the initial RTLD_GLOBAL dlmopen'd
+	 libraries.  */
+      ns->_ns_main_searchlist = &new->l_searchlist;
+      /* Treat this list like it is read-only.  A value of zero forces a copy
+	 later if we need to extend this list.  The list itself is already
+	 being used as the primary scope for the first loaded RTLD_GLOBAL
+	 object into the new namespace, thus we don't want to free it.  */
+      ns->_ns_global_scope_alloc = 0;
+    }
+
   /* The symbols of the new objects and its dependencies are to be
      introduced into the global scope that will be used to resolve
      references from other dynamically-loaded objects.
@@ -86,7 +111,6 @@ add_to_global (struct link_map *new)
      in an realloc() call.  Therefore we allocate a completely new
      array the first time we have to add something to the locale scope.  */
 
-  struct link_namespaces *ns = &GL(dl_ns)[new->l_ns];
   if (ns->_ns_global_scope_alloc == 0)
     {
       /* This is the first dynamic object given global scope.  */
